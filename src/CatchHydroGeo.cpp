@@ -143,8 +143,14 @@ int catchhydrogeo(char *handfile, char*catchfile, char *slpfile, char *hfile, ch
 				fscanf(fp, "%lf\n", &height[j]);
 			} 
 			fclose(fp);
+			MPI_Bcast(&nheight, 1, MPI_INT, 0, MCW);
+			MPI_Bcast(height, nheight, MPI_DOUBLE, 0, MCW);
 		}
-		//TODO - Here need to push nheight and height to other processes for parallel
+		else{
+			MPI_Bcast(&nheight, 1, MPI_INT, 0, MCW);
+			height = new double[nheight];
+			MPI_Bcast(height, nheight, MPI_DOUBLE, 0, MCW);
+		}
 
 		//Create output vectors
 		vector< vector<int> > CellCount(nmax, vector<int>(nheight, 0));
@@ -170,7 +176,7 @@ int catchhydrogeo(char *handfile, char*catchfile, char *slpfile, char *hfile, ch
 					catchData->getData(i, j, tempcatch);
 					slpData->getData(i, j, tempslp);
 					for (k = 0; k < nheight; k++) {
-						if (temphand < height[k]) {  // DGT prefers strictly less than here.  If the depth is 0, I treat it as dry
+						if (temphand < height[k] || temphand == 0.0) {  // DGT prefers strictly less than here.  If the depth is 0, I treat it as dry
 							CellCount[tempcatch][k] = CellCount[tempcatch][k] + 1;
 							double dxc, dyc, cellArea;
 							handData->getdxdyc(j, dxc, dyc);  // This function gets latitude dependent dx and dy for each cell, better than averages
@@ -198,6 +204,7 @@ int catchhydrogeo(char *handfile, char*catchfile, char *slpfile, char *hfile, ch
 				MPI_Reduce(&Volume[i][j], &GVolume[i][j], 1, MPI_FLOAT, MPI_SUM, 0, MCW);
 			}
 		}
+
 		//Write results
 		if (rank == 0) {
 			FILE *fp;
